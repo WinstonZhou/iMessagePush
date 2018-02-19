@@ -3,16 +3,11 @@ using terms from application "Messages"
 	on message received theMessage from theBuddy for theChat with theMessageText
 		set senderName to (get name of theBuddy)
 		set messageContents to theMessageText
-		set messageBlock to senderName & "::::" & messageContents
-		set messageInfoPath to "/Users/winstonzhou/Library/Application Scripts/com.apple.iChat/messageInfo.txt"
-		set eof messageInfoPath to 0
-		set myFile to open for access (messageInfoPath) with write permission
-		write messageBlock to myFile
-		close access myFile
-		do shell script "python -i '/Users/winstonzhou/Library/Application Scripts/com.apple.iChat/pushbulletPush.py'"
+		do shell script "{path_to_pushbullet.py} " & quoted form of senderName & " " & quoted form of messageContents
 	end message received
 	
-	# The following are unused but need to be defined to avoid an error
+	(* https://discussions.apple.com/thread/6476545 (Code citation)
+	Empty handlers below *)
 	
 	on received text invitation theText from theBuddy for theChat
 		

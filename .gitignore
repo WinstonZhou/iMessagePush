@@ -1,0 +1,3 @@
+# Ignore applescript containing actual path and API key
+iMessage Push Actual.applescript
+pushbulletPushActual.py

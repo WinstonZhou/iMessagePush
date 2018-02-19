@@ -1,12 +1,12 @@
-import os.path
+import sys
 from pushbullet import Pushbullet
 
-path = os.path.dirname(os.path.realpath(__file__)) + os.sep + "messageInfo.txt"
+pb = Pushbullet("Pushbullet API Key string here")
 
-pb = Pushbullet("Pushbullet API Key Here")
+def push(sender, message):
+    push = pb.push_note(sender, message)
 
-messageFile = open(path)
-messageReading = messageFile.read()
-messageContents = messageReading.split("::::")
-
-push = pb.push_note(messageContents[0], messageContents[1])
+if __name__ == '__main__':
+    sender = sys.argv[1]
+    message = sys.argv[2]
+    push(sender, message)
