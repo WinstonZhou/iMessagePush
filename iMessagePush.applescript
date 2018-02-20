@@ -3,7 +3,7 @@ using terms from application "Messages"
 	on message received theMessage from theBuddy for theChat with theMessageText
 		set senderName to (get name of theBuddy)
 		set messageContents to theMessageText
-		do shell script "{path_to_pushbullet.py} " & quoted form of senderName & " " & quoted form of messageContents
+		do shell script "python -i '{path_to_iMessagePush.py}' " & quoted form of senderName & " " & quoted form of messageContents
 	end message received
 	
 	(* https://discussions.apple.com/thread/6476545 (Code citation)
