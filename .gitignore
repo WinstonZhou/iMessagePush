@@ -1,3 +1,7 @@
 # Ignore personal applescript and python files
 iMessagePushActual.applescript
 iMessagePushActual.py
+mkdirlock.scpt
+shutdowndelay.scpt
+superusercrontabadd.scpt
+wakeDate.scpt
