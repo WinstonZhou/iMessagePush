@@ -1,73 +1,52 @@
+# DO NOT ACCIDENTLY UPLOAD THIS TO GITHUB
+# Rename as iMessagePush.py once setup complete
+
 import sqlite3
 import subprocess
-import datetime
 import sys
 from pushbullet import Pushbullet
 from string import printable
+import os.path
 
 pb = Pushbullet("Pushbullet API Key string here")
 
-# https://stackoverflow.com/questions/7147396/ (Code Citation)
-def removeHidden(inputString): # removes hidden strings
+def removeHidden(inputString): 
     return ''.join(char for char in inputString if char in printable)
 
-# Remove potential "{Buddy} says" prefix string 
 def removeBuddySays(sender, message):
     messageList = message.split(" ")
     offendingPhrase = sender.split(" ") + ["says"]
-    # print(offendingPhrase)
-
-    # Remove offending phrase
     for i, offendingWord in enumerate(offendingPhrase):
         if removeHidden(offendingWord) == removeHidden(messageList[0]):
-            # print("Removing ", messageList[0])
             messageList.pop(0)
-        else: # no offending phrase
+        else: 
             return message
     return " ".join(messageList)
 
-# iMessage on macOS stores timestamps with a January 1, 2001 epoch time
-# which is 978307200 seconds behind the UNIX epoch time of 1/1/70
 def iMessageUNIXTime(unixTime):
     return (unixTime - 978307200)
 
-# Determines when the Macintosh last entered the S3 "sleep" ACPI power state
-def lastSleepStart():
-    sleepTime = subprocess.check_output("pmset -g log|grep -e ' Sleep  ' | tail -n 1", 
-                                        shell = True).decode("utf-8")[:19] # 19 is the relevant portion
-    # print(sleepTime)
-    # Convert to iMessage chat.db datetime
-    sleepTime = iMessageUNIXTime(datetime.datetime.strptime(sleepTime,
-                                                            "%Y-%m-%d %H:%M:%S").timestamp())
-    return sleepTime
-
-# Determines when the Macintosh last entered the S5 "Shutdown" ACPI power state
-def lastShutdown():
-    shutdownTime = subprocess.check_output("syslog | grep -e 'shutdown' | tail -n 1", 
-                                        shell = True).decode("utf-8").split(" ")[-2]
-    # print(shutdownTime)
-    shutdownTime = iMessageUNIXTime(int(shutdownTime))
-    return shutdownTime
-
-# Retrieves and pushes new iMessages based on the time the Macintosh was last
-# shut down or put to sleep
-def getMostRecent(startingTime):
-    conn = sqlite3.connect("~/library/messages/chat.db")
+def getMostRecent(n):
+    contactMappingPath = os.path.expanduser("~/library/Application Scripts/com.apple.iChat/contactMapper.applescript")
+    conn = sqlite3.connect(os.path.expanduser("~/library/messages/chat.db"))
     c =  conn.cursor()
     messageList = []
     senderDict = {}
     senderList = []
+    formattedSenderList = [] # actual sender names from Contacts application
     senderCounter = 0
-    recentIndex = (startingTime, )
+    recentIndex = (n, )
     batchedMessageList = []
-    for row in c.execute("SELECT handle_id, text, date/1000000000, is_sent from message where date/1000000000 > ? and is_sent < 1", recentIndex):
+    for row in c.execute("select * from (select handle_id, text, rowid from message where is_sent < 1 order by rowid DESC LIMIT ?) order by rowid ASC;", recentIndex):
         messageList.append(row)
-    # print(messageList)
+    # print("MessageList:", messageList)
     for message in messageList:
         t = (message[0],)
         c.execute("SELECT id FROM handle where rowid = ?", t)
         senderDict[t[0]] = c.fetchone()[0]
-    # print(senderDict)
+    # print("SenderDictionary:", senderDict)
+    # Construct a list batchedMessageList where each element is a string
+    # representing the batched messages of a single sender
     for key in senderDict:
         senderList.append(senderDict[key])
         batchedMessageList.append("")
@@ -75,21 +54,35 @@ def getMostRecent(startingTime):
             if key == message[0]:
                 batchedMessageList[senderCounter] += (message[1]) + "\n"
         senderCounter += 1
-    # print(senderList)
-    # print(batchedMessageList)
+    for i in range(len(batchedMessageList)):
+        batchedMessageList[i] = batchedMessageList[i][:-1] # remove last newline character
+    # print("SenderList:", senderList)
+    for senderIndex, sender in enumerate(senderList):
+        if "@" in sender: #iMessage ID is an email address
+            formattedName = subprocess.check_output("osascript '%s' '%s' 'email'" % (contactMappingPath, sender), shell = True).decode("utf-8")
+        else: #iMessage ID is a phone number
+            formattedName =subprocess.check_output("osascript '%s' '%s' 'phone'" % (contactMappingPath, sender), shell = True).decode("utf-8")
+        if formattedName != "None\n": # matched iMessage ID with a contact's name successfully
+            formattedSenderList.append(formattedName)
+        else: # iMessage ID not listed in Contacts application
+            formattedSenderList.append(sender)
+        # remove trailing newlines from formatted name
+        formattedSenderList[senderIndex] = formattedSenderList[senderIndex].strip('\n') 
+    # print("Formatted SenderList:", formattedSenderList)
+    # print("BatchedMessageList:", batchedMessageList)
     for batchIndex, batch in enumerate(batchedMessageList):
-        push = pb.push_note(senderList[batchIndex], batch)
+        push = pb.push_note(formattedSenderList[batchIndex], batch)
 
-# Pushes a single iMessage
 def push(sender, message):
     push = pb.push_note(sender, removeBuddySays(sender, message))
 
 if __name__ == '__main__':
-    if sys.argv[1] == "Shutdown":
-        getMostRecent(lastShutdown())
-    elif sys.argv[1] == "Sleep":
-        getMostRecent(lastSleepStart())
-    else: # sys.argv[1] == "Single":
+    if int(sys.argv[1]) == 1:
         sender = sys.argv[2]
         message = sys.argv[3]
         push(sender, message)
+    else: # int(sys.argv[1]) > 1 thus indicating batch-message state
+        getMostRecent(int(sys.argv[1]))
+        
+        
+ 

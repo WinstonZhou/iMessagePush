@@ -1,7 +1,8 @@
-# Ignore personal applescript and python files
-iMessagePushActual.applescript
+# Ignore personal applescript and python files 
+iMessagePushActual.applescript 
 iMessagePushActual.py
-mkdirlock.scpt
-shutdowndelay.scpt
-superusercrontabadd.scpt
-wakeDate.scpt
+contactMapperActual.applescript 
+mkdirlock.scpt 
+shutdowndelay.scpt 
+superusercrontabadd.scpt 
+wakeDate.scpt 
