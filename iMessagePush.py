@@ -1,14 +1,76 @@
-# DO NOT ACCIDENTLY UPLOAD THIS TO GITHUB
-# Rename as iMessagePush.py once setup complete
-
 import sqlite3
 import subprocess
 import sys
-from pushbullet import Pushbullet
 from string import printable
 import os.path
+import requests
+import json
 
-pb = Pushbullet("Pushbullet API Key string here")
+pbSession = requests.Session()
+pbSession.auth = ("Pushbullet API Key string here", "")
+jsonHeader = {'Content-Type': 'application/json'}
+pbSession.headers.update(jsonHeader)
+pushURL = "https://api.pushbullet.com/v2/pushes"
+
+def notePushBatch(title, body):
+    previousMessageBatch = pushHistory(title)
+    noteDataDictionary = {"title": title,
+                          "body": previousMessageBatch + body,
+                          "type": "note"}
+    pbResponseObject = pbSession.post(pushURL,
+                                      data = json.dumps(noteDataDictionary))
+
+'''
+pushHistory checks if the sender already has an active notification
+If active notification exists for a sender, pushHistory dismisses the existing
+notification and replaces it with a new notification that includes the old
+notification content and the new message. 
+
+pushHistory will check for existing notifications as far as max_interation
+so if max_iteration = 4, then the program will find a sender's existing 
+notification so long as there are 4 or less existing notifications from 
+different sender(s) ahead of the sender's existing notification.
+
+Dismissing a notification from 1 sender while leaving other existing 
+notifications from other senders active and running pushHistory will cause
+the while loop to exit early.
+'''
+def pushHistory(sender):
+    currentLimit = 1
+    max_iteration = 4 # higher is more costly, but deeper batch capability
+    while currentLimit <= max_iteration:
+        pbResponseObject = pbSession.get(pushURL,
+                                     params = {"limit": int(currentLimit),
+                                               "active": "true"})
+        # print("currentLimit", currentLimit)
+        messageDictLen = len(pbResponseObject.json()["pushes"])
+        # print("Messages Dictionary Length", messageDictLen)
+        if messageDictLen > 0:
+            previousSender = pbResponseObject.json()["pushes"][-1]["title"]
+            previousMessage = pbResponseObject.json()["pushes"][-1]["body"]
+            previousIden = pbResponseObject.json()["pushes"][-1]["iden"]
+            previousDismissed = pbResponseObject.json()["pushes"][-1]["dismissed"]
+            # print("Previous Sender:", previousSender)
+            # print("Message:", previousMessage)
+            # print("Iden:", previousIden)
+            # print("Dismissal status:", previousDismissed)
+            if previousDismissed == True:
+                # print("Dismissed!")
+                return ""
+            elif previousSender == sender:
+                deletePush(previousIden)
+                # print("Deleted Old Message")
+                return previousMessage + "\n"
+            else:
+                # print("Notification Active")
+                currentLimit += 1
+        else: # pushes dictionary is empty 
+            # print("Messages Dictionary length was 0?")
+            currentLimit += 1
+    return ""
+
+def deletePush(iden):
+    pbResponseObject = pbSession.delete(pushURL + "/" + iden)
 
 def removeHidden(inputString): 
     return ''.join(char for char in inputString if char in printable)
@@ -22,9 +84,6 @@ def removeBuddySays(sender, message):
         else: 
             return message
     return " ".join(messageList)
-
-def iMessageUNIXTime(unixTime):
-    return (unixTime - 978307200)
 
 def getMostRecent(n):
     contactMappingPath = os.path.expanduser("~/library/Application Scripts/com.apple.iChat/contactMapper.applescript")
@@ -71,18 +130,15 @@ def getMostRecent(n):
     # print("Formatted SenderList:", formattedSenderList)
     # print("BatchedMessageList:", batchedMessageList)
     for batchIndex, batch in enumerate(batchedMessageList):
-        push = pb.push_note(formattedSenderList[batchIndex], batch)
+        notePushBatch(formattedSenderList[batchIndex], batch)
 
 def push(sender, message):
-    push = pb.push_note(sender, removeBuddySays(sender, message))
+    notePushBatch(sender, removeBuddySays(sender, message))
 
 if __name__ == '__main__':
-    if int(sys.argv[1]) == 1:
+    if int(sys.argv[1]) == 1: # e.g. python -i iMessagePush.py "1" "Name" "Hi!"
         sender = sys.argv[2]
         message = sys.argv[3]
         push(sender, message)
     else: # int(sys.argv[1]) > 1 thus indicating batch-message state
         getMostRecent(int(sys.argv[1]))
-        
-        
- 

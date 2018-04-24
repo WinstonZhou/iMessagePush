@@ -47,20 +47,20 @@ using terms from application "Messages"
 		set messageContents to theMessageText
 		try
 			(* Prevent parallel execution of iMessagePush.py by creating 
-				a directory called ~/iMessagePushLock that acts as a lock. Only one 
-				instance of this applescript will manage to create the lock 
-				directory, which once created will lock out all other instances 
-				of this applescript that were running in parallel.	*) 
+			   a directory called ~/iMessagePushLock that acts as a lock. Only one 
+			   instance of this applescript will manage to create the lock 
+			   directory, which once created will lock out all other instances 
+			   of this applescript that were running in parallel.	*) 
 			set lockStatus to do shell script "mkdir " & (POSIX path of (path to home folder)) & "iMessagePushLock"
 			delay 1
-			(* the number of new messages is equal to the number of instances
+			(* The number of new messages is equal to the number of instances
 			   of this AppleScript being run in parallel*)
-			set newMessageCount to do shell script "ps -clx | grep -c 'osascript'"
+			set newMessageCount to do shell script "ps x | grep -c '[i]MessagePush.applescript'" 
 			do shell script "/usr/local/bin/python3 \"" & (POSIX path of (path to home folder)) & "Library/Application Scripts/com.apple.iChat/iMessagePush.py\" " & quoted form of newMessageCount & " " & quoted form of senderName & " " & quoted form of messageContents & " && rm -r " & (POSIX path of (path to home folder)) & "iMessagePushLock"
 			
 			(* Prevent the Macintosh server from entering its sleep state 
-				for at least another 30 minutes (1800 seconds) if this  
-				applescript runs. *) 
+			   for at least another 30 minutes (1800 seconds) if this  
+			   AppleScript runs. *) 
 			set newSleepTime to number_to_string(unixCurrentDate(current date) + 1800) 
 			set cronSleepHour to do shell script "date -r " & newSleepTime & " +%-H"
 			set cronSleepMinute to do shell script "date -r " & newSleepTime & " +%-M"
